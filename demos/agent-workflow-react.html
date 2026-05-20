@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent ReAct 工作流 · AI×Web3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface-2: #1c1c2e;
+    --border: #2a2a3e;
+    --text: #e4e4ed;
+    --text-dim: #8888a0;
+    --accent: #6c5ce7;
+    --accent-glow: rgba(108,92,231,0.25);
+    --green: #00cec9;
+    --green-glow: rgba(0,206,201,0.2);
+    --orange: #fd79a8;
+    --orange-glow: rgba(253,121,168,0.2);
+    --blue: #74b9ff;
+    --blue-glow: rgba(116,185,255,0.2);
+    --yellow: #fdcb6e;
+    --yellow-glow: rgba(253,203,110,0.2);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 40px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 32px 0 24px;
+    max-width: 640px;
+  }
+  .header .badge {
+    display: inline-block;
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid rgba(108,92,231,0.3);
+    border-radius: 999px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6c5ce7, #00cec9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.3;
+  }
+  .header p {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 10px;
+  }
+
+  /* Flow container */
+  .flow-container {
+    width: 100%;
+    max-width: 720px;
+    position: relative;
+  }
+
+  /* Step card */
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 0;
+    opacity: 0.3;
+    transform: translateX(-12px);
+    transition: all 0.5s cubic-bezier(0.22,1,0.36,1);
+    position: relative;
+    cursor: pointer;
+  }
+  .step-card.active {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .step-card.done {
+    opacity: 0.7;
+    transform: translateX(0);
+    border-color: transparent;
+  }
+  .step-card.done .step-badge { background: var(--green); color: #000; }
+  .step-card.done .step-label { color: var(--green); }
+
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .step-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    transition: color 0.3s;
+  }
+  .step-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 4px 0 0 40px;
+  }
+  .step-body {
+    margin: 12px 0 0 40px;
+    display: none;
+  }
+  .step-card.active .step-body { display: block; }
+  .step-card.done .step-body { display: none; }
+
+  .step-body p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  .step-body .code {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text);
+  }
+  .step-body .highlight {
+    color: var(--yellow);
+  }
+  .step-body .highlight-green { color: var(--green); }
+  .step-body .highlight-pink { color: var(--orange); }
+  .step-body .highlight-blue { color: var(--blue); }
+
+  /* Connector line between steps */
+  .connector {
+    width: 2px;
+    height: 32px;
+    background: var(--border);
+    margin: 0 auto;
+    position: relative;
+    transition: background 0.5s;
+  }
+  .connector.active {
+    background: linear-gradient(to bottom, var(--accent), transparent);
+  }
+  .connector .arrow {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--border);
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    border-color: var(--accent);
+  }
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #7d6ff0;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+  .btn-outline {
+    background: transparent;
+    border-color: var(--border);
+  }
+
+  /* Progress bar */
+  .progress-wrapper {
+    width: 100%;
+    max-width: 720px;
+    margin: 16px 0 24px;
+  }
+  .progress-bar {
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* Done state */
+  .done-state {
+    display: none;
+    text-align: center;
+    padding: 40px 0;
+  }
+  .done-state.show {
+    display: block;
+    animation: fadeUp 0.6s ease;
+  }
+  .done-state .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  .done-state h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .done-state p {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Responsive */
+  @media (max-width: 520px) {
+    .step-card { padding: 16px; }
+    .step-title { font-size: 15px; margin-left: 0; }
+    .step-body { margin-left: 0; }
+    .step-header { flex-wrap: wrap; }
+    .header h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">🧪 AI × Web3 School · Week 1</div>
+  <h1>Agent ReAct 工作流</h1>
+  <p>一步步观察 AI Agent 如何「思考→调用链上工具→观察结果→再次思考」— 这是 AI×Web3 最核心的心智模型</p>
+</div>
+
+<div class="progress-wrapper">
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-label">
+    <span id="stepCounter">0 / 6</span>
+    <span id="progressPct">0%</span>
+  </div>
+</div>
+
+<div class="flow-container" id="flowContainer">
+  <!-- Steps rendered by JS -->
+</div>
+
+<div class="controls">
+  <button class="btn btn-outline" id="prevBtn" disabled>
+    ← 上一步
+  </button>
+  <button class="btn btn-primary" id="nextBtn">
+    下一步 →
+  </button>
+  <button class="btn btn-outline" id="resetBtn">
+    ↺ 重置
+  </button>
+</div>
+
+<div class="done-state" id="doneState">
+  <div class="icon">🎉</div>
+  <h2>你已理解 Agent ReAct 工作流</h2>
+  <p>
+    AI Agent 并非「一步到位」— 它在 Thought → Action → Observation 的循环中
+    逐步逼近目标。这就是 LLM 驱动自主代理的底层架构。
+  </p>
+  <p style="margin-top:12px; font-size:13px;">
+    下一步：试试用这个模型分析一个真实场景 —<br>
+    让 Agent「帮我查一下 ETH 余额，如果大于 0.1 就转 0.05 给 Bob」
+  </p>
+</div>
+
+<script>
+const STEPS = [
+  {
+    label: 'User Prompt',
+    title: '用户输入 → 触发 Agent',
+    badgeColor: '#6c5ce7',
+    body: `<p>一切始于用户的自然语言请求。关键区别在于：<strong>用户不需要关心具体怎么查链、怎么签名</strong>，只需描述目标。</p>
+<p style="margin-top:8px; color:var(--yellow);">💬 例如：</p>
+<div class="code" style="color:var(--text-dim);">"查看 0xABC… 地址上的 USDC 余额，
+如果 > 100 USDC，帮我给 Alice 转 50 USDC"</div>
+<p>Agent 的职责：<span class="highlight">理解意图 → 分解步骤 → 规划行动</span></p>`
+  },
+  {
+    label: 'Thought',
+    title: 'LLM 推理：理解意图，制定计划',
+    badgeColor: '#74b9ff',
+    body: `<p>LLM 核心引擎开始工作。它会将用户输入拆解为可以执行的步骤：</p>
+<div class="code"><span class="highlight">Thought:</span> 用户想查 USDC 余额。我需要先调用
+<strong>eth_call</strong> 读取 USDC 合约的 balanceOf 方法。
+余额 > 100 时，需要构造一笔 ERC20 transfer 交易。
+
+<span class="highlight-blue">→ 我需要这些工具：</span>
+  • read_contract(address, abi, method, args)
+  • send_transaction(tx, signer)</div>
+<p>这一步最关键：<span class="highlight">LLM 不是直接执行，而是「推理出需要什么工具 + 按什么顺序调用」</span>。这区别于传统 if-else 脚本。</p>`
+  },
+  {
+    label: 'Action',
+    title: '工具调用 → 链上交互（Read）',
+    badgeColor: '#00cec9',
+    body: `<p>Agent 调用第一个工具：<strong>读取链上数据</strong>。这是 Web3 Tool Use 的核心模式。</p>
+<div class="code"><span class="highlight-green">Action:</span> read_contract(
+  contract: "0xA0b8... (USDC)",
+  method: "balanceOf",
+  args: ["0xABC..."]
+)</div>
+<p>底层实际发出的是 <span class="highlight-green">eth_call</span> RPC 请求，不消耗 Gas，不改变链上状态。</p>
+<p style="margin-top:8px; color:var(--text-dim);">💡 Chain-aware Context 的关键：Agent 需要知道合约地址、ABI、链 ID 这些「上下文信息」才能正确调用。这些信息可以预注入到 prompt 中。</p>`
+  },
+  {
+    label: 'Observation',
+    title: '观察结果 → 更新上下文',
+    badgeColor: '#fdcb6e',
+    body: `<p>链上返回结果，Agent 收到并「观察」到数据：</p>
+<div class="code"><span class="highlight">Observation:</span> balanceOf("0xABC...") = 1,500 USDC
+
+<span class="highlight-blue">→ 余额 1,500 > 100，条件满足。
+→ 下一步：构造转账交易。</span></div>
+<p>这是 ReAct 循环的精髓：<span class="highlight">Observation 不会直接执行操作，而是回到 LLM 的上下文，让 LLM 基于新信息做下一步推理</span>。</p>
+<p style="margin-top:8px; color:var(--text-dim);">🔁 ReAct = Reasoning + Acting — 推理和行动交替进行，每次观察都更新「世界状态」。</p>`
+  },
+  {
+    label: 'Action 2',
+    title: '工具调用 → 链上交互（Write）',
+    badgeColor: '#fd79a8',
+    body: `<p>Agent 基于观察结果，决定执行链上写入操作：</p>
+<div class="code"><span class="highlight-pink">Action:</span> send_transaction(
+  to: "USDC_COIN_ADDRESS",
+  data: "transfer(Alice, 50 USDC)",
+  signer: "agent_wallet_1"
+)</div>
+<p>这里涉及 <strong>Agent Wallet</strong> 概念：</p>
+<p style="margin-top:8px; font-size:14px;">
+  🔑 Agent 需要拥有私钥才能签名交易。<br>
+  🔑 真正上链需要 <strong>Gas</strong>（ETH 或原生代币）。<br>
+  🔑 交易被广播到 Mempool → 矿工/验证者打包 → 上链。
+</p>
+<div class="code" style="color:var(--text-dim); font-size:12px;"># 幕后发生了什么
+1. Agent 构造交易 {to, value, data, gas, nonce}
+2. 用私钥签名 → 得到 (r, s, v)
+3. 调用 eth_sendRawTransaction 广播
+4. 等待交易收据（receipt）</div>`
+  },
+  {
+    label: 'Observation → Done',
+    title: '确认收据 → 输出给用户',
+    badgeColor: '#00cec9',
+    body: `<p>交易确认后，Agent 收到交易收据，生成最终回复：</p>
+<div class="code"><span class="highlight">Observation:</span> tx hash: 0x7a9e...f3b2
+  status: ✅ Success
+  block: 21,345,678
+  gasUsed: 52,341
+  transfer: 50 USDC → Alice ✅
+
+<span class="highlight-green">✅ 目标达成。输出给用户：</span></div>
+<p>最终回复（自然语言）：</p>
+<div class="code" style="color:var(--text-dim);">✅ 已完成！0xABC... 地址有 1,500 USDC，
+已转 50 USDC 给 Alice (0xAlice...)。
+交易哈希：0x7a9e...f3b2
+可在 Etherscan 查看：https://etherscan.io/tx/0x7a9e...f3b2</div>
+<p style="margin-top:8px; color:var(--yellow);">🎯 关键洞察：<strong>用户只说了「查余额、转 USDC」，Agent 自主完成了意图理解、规划、读链、推理、写链、确认的全部流程</strong>。</p>`
+  }
+];
+
+let currentStep = -1; // -1 = initial state before any step
+const totalSteps = STEPS.length;
+
+function render() {
+  const container = document.getElementById('flowContainer');
+  container.innerHTML = STEPS.map((s, i) => `
+    <div class="step-card" id="step-${i}" data-idx="${i}">
+      <div class="step-header">
+        <div class="step-badge" style="border-color:${s.badgeColor}; color:${s.badgeColor};">${i + 1}</div>
+        <span class="step-label" style="color:${s.badgeColor};">${s.label}</span>
+      </div>
+      <div class="step-title">${s.title}</div>
+      <div class="step-body">${s.body}</div>
+    </div>
+    ${i < totalSteps - 1 ? `<div class="connector" id="connector-${i}"><div class="arrow"></div></div>` : ''}
+  `).join('');
+}
+
+function update() {
+  const progressFill = document.getElementById('progressFill');
+  const stepCounter = document.getElementById('stepCounter');
+  const progressPct = document.getElementById('progressPct');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const doneState = document.getElementById('doneState');
+
+  const pct = currentStep < 0 ? 0 : Math.round(((currentStep + 1) / totalSteps) * 100);
+  progressFill.style.width = pct + '%';
+  stepCounter.textContent = currentStep < 0 ? `0 / ${totalSteps}` : `${currentStep + 1} / ${totalSteps}`;
+  progressPct.textContent = pct + '%';
+
+  for (let i = 0; i < totalSteps; i++) {
+    const card = document.getElementById(`step-${i}`);
+    const connector = document.getElementById(`connector-${i}`);
+    if (!card) continue;
+
+    card.classList.remove('active', 'done');
+    if (i < currentStep) {
+      card.classList.add('done');
+      if (connector) connector.classList.add('active');
+    } else if (i === currentStep) {
+      card.classList.add('active');
+      // Auto-scroll into view
+      setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+  }
+
+  prevBtn.disabled = currentStep <= 0;
+  nextBtn.disabled = currentStep >= totalSteps - 1;
+  doneState.classList.toggle('show', currentStep >= totalSteps - 1);
+}
+
+function next() {
+  if (currentStep < totalSteps - 1) {
+    currentStep++;
+    update();
+  }
+}
+
+function prev() {
+  if (currentStep > 0) {
+    currentStep--;
+    update();
+  } else if (currentStep === 0) {
+    currentStep = -1;
+    update();
+  }
+}
+
+function reset() {
+  currentStep = -1;
+  update();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    if (currentStep < totalSteps - 1) next();
+  }
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    prev();
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    reset();
+  }
+});
+
+render();
+update();
+
+document.getElementById('nextBtn').addEventListener('click', next);
+document.getElementById('prevBtn').addEventListener('click', prev);
+document.getElementById('resetBtn').addEventListener('click', reset);
+</script>
+</body>
+</html>

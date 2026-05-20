@@ -1,0 +1,40 @@
+# === Node / Hardhat (contract/) ===
+node_modules/
+contract/artifacts/
+contract/cache/
+contract/typechain-types/
+contract/deployment.json
+
+# === Python / Backend ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.pytest_cache/
+
+# === Vite / Frontend ===
+frontend/dist/
+frontend/.vite/
+
+# === Env files (keep .env.example, ignore .env) ===
+.env
+.env.local
+.env.production
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+*.log
+npm-debug.log*

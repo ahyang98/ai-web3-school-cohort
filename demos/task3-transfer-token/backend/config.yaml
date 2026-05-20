@@ -1,0 +1,13 @@
+agent:
+  mode: "mock"
+  llm_model: "gpt-4o-mini"
+  hermes:
+    cli_path: "hermes"
+    model: "deepseek-v4-flash"
+    provider: "deepseek"
+    timeout: 30
+
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  contract_address: ""
+  max_steps: 10
